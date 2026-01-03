@@ -29,13 +29,13 @@
         
         /* 交互面板 */
         #wish-panel {
-            position: absolute; 
+            position: fixed; 
             right: 20px; 
             top: 50%; 
             transform: translateY(-50%);
             width: 380px; 
             max-width: 85vw;
-            background: rgba(0, 10, 30, 0.95); 
+            background: rgba(0, 10, 30, 0.98); 
             border-left: 2px solid var(--cyan);
             padding: 25px; 
             backdrop-filter: blur(20px); 
@@ -58,15 +58,47 @@
             to { transform: translateY(-50%) translateX(0); opacity: 1; }
         }
         
+        /* 面板头部 - 包含关闭按钮 */
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(0,242,255,0.5);
+        }
+        
+        .panel-close-btn {
+            background: rgba(0, 30, 60, 0.8);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 242, 255, 0.4);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s ease;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+            margin-left: 15px;
+        }
+        
+        .panel-close-btn:hover, .panel-close-btn:active {
+            background: rgba(0, 119, 255, 0.6);
+            transform: scale(0.95);
+            box-shadow: 0 0 15px rgba(0,242,255,0.5);
+        }
+        
         .kw-tag { 
             color: var(--cyan); 
             font-size: 28px; 
             font-weight: bold; 
-            margin-bottom: 20px; 
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(0,242,255,0.5); 
-            display: flex;
-            align-items: center;
+            margin: 0;
+            flex-grow: 1;
         }
         
         .kw-tag::before {
@@ -107,7 +139,7 @@
         }
         
         header { 
-            position: absolute; 
+            position: fixed; 
             top: 20px; 
             left: 20px; 
             z-index: 10; 
@@ -137,7 +169,7 @@
         
         /* 移动端控制按钮 */
         #mobile-controls {
-            position: absolute;
+            position: fixed;
             bottom: 25px;
             left: 50%;
             transform: translateX(-50%);
@@ -172,7 +204,7 @@
         
         /* 加载提示 */
         #loading {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -227,6 +259,22 @@
                 padding: 20px;
             }
             
+            .panel-header {
+                position: sticky;
+                top: 0;
+                background: rgba(0, 10, 30, 0.95);
+                padding-top: 10px;
+                margin-top: -10px;
+                z-index: 101;
+                padding-bottom: 15px;
+            }
+            
+            .panel-close-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 28px;
+            }
+            
             #mobile-controls {
                 display: flex;
             }
@@ -261,6 +309,12 @@
                 padding: 15px;
             }
             
+            .panel-close-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 24px;
+            }
+            
             .mobile-btn {
                 width: 50px;
                 height: 50px;
@@ -277,7 +331,10 @@
 </header>
 
 <div id="wish-panel">
-    <div id="panel-keyword" class="kw-tag"># 关键词</div>
+    <div class="panel-header">
+        <div id="panel-keyword" class="kw-tag"># 关键词</div>
+        <button class="panel-close-btn" id="panel-close">×</button>
+    </div>
     <div id="panel-list"></div>
 </div>
 
@@ -295,7 +352,7 @@
 <div id="container"></div>
 
 <script>
-// 1. 全量原始句子数据库 - 根据Excel表格更新
+// 1. 全量原始句子数据库 - 根据最新Excel表格更新
 const allSentences = [
     "希望我cp大卖",
     "希望运气可以变好。至少不要再触发祸不单行了🙏",
@@ -324,7 +381,8 @@ const allSentences = [
     "2026.6希望大家如愿以偿",
     "我希望生活好的超过一万倍我的预期  翻倍也好",
     "天天开心",
-    "一切顺利"
+    "一切顺利",
+    "她好好的，自己能有个好的成绩",
 ];
 
 // 2. 映射逻辑 (句子索引映射)
@@ -333,23 +391,25 @@ const sIdx = {
     GENSHIN: 7, SUNRISE: 8, MATH: 9, START: 10, JOY: 11, HEALTH: 12, HAPPY: 13, 
     COURAGE: 14, BEAT: 15, DAILY_HAPPY: 16, SCORE: 17, CIRCLE: 18, 
     SMOOTH: 19, STUDY: 20, PROGRESS: 21, ALL_GOOD: 22, DETAILED_WISH: 23, 
-    JUNE: 24, LIFE_GOOD: 25, DAY_HAPPY: 26, SMOOTH_ALL: 27
+    JUNE: 24, LIFE_GOOD: 25, DAY_HAPPY: 26, SMOOTH_ALL: 27,
+    HER_GOOD: 28, // 新增愿望索引
 };
 
 // 3. 创建关键词库并正确计算频率
 // 首先分析所有句子，提取关键词并计算实际频率
 const keywordFrequencyMap = {};
 
-// 定义所有可能的关键词
+// 定义所有可能的关键词（包含新增愿望中的关键词）
 const allKeywords = [
     "希望", "高考", "开心", "幸福", "快乐", "新的一年", "顺利", "金榜题名", 
     "顺遂", "大学", "如意", "上岸", "勇气", "平安", "健康", "进步", 
     "如愿以偿", "终末地", "原神", "数学", "旭日", "前路", "爱", "常欢愉", 
     "皆胜意", "出发", "章鱼", "小汤圆", "600+", "时间", "圆", "起点", 
     "学业有成", "超常发挥", "万事顺遂", "2026.6", "生活", "预期", "天天开心", 
-    "一切顺利", "cp大卖", "运气", "我推", "世界和平", "启动", "照亮",
+    "一切顺利", "cp大卖", "运气", "祸不单行", "我推", "世界和平", "启动", "照亮",
     "大家", "自己", "未来", "美好", "金榜", "马到成功", "心想事成", "脚踏实地",
-    "成绩", "理想", "安康", "新年", "前路", "旭日初升", "祝福", "寄语"
+    "成绩", "理想", "安康", "新年", "前路", "旭日初升", "祝福", "寄语",
+    "好好", "她" // 新增愿望中的关键词
 ];
 
 // 初始化频率计数
@@ -614,10 +674,12 @@ function onMouseClick(e) {
         // 移动端优化：自动旋转暂停
         if (isMobile) {
             rotate = false;
+            document.getElementById('rotate-toggle').textContent = "‖";
+            document.getElementById('rotate-toggle').style.backgroundColor = "rgba(0, 119, 255, 0.7)";
         }
     } else {
-        // 如果点击空白处，关闭面板（移动端）
-        if (isMobile && panel.classList.contains('active')) {
+        // 如果点击空白处，在桌面端关闭面板
+        if (!isMobile && panel.classList.contains('active')) {
             panel.classList.remove('active');
             rotate = true;
         }
@@ -681,6 +743,14 @@ function onTouchStart(e) {
             
             // 移动端优化：自动旋转暂停
             rotate = false;
+            document.getElementById('rotate-toggle').textContent = "‖";
+            document.getElementById('rotate-toggle').style.backgroundColor = "rgba(0, 119, 255, 0.7)";
+            
+            // 阻止默认行为，避免页面滚动
+            e.preventDefault();
+        } else {
+            // 移动端点击空白处不关闭面板，避免误操作
+            // 只有通过关闭按钮才能关闭面板
         }
     }
 }
@@ -692,11 +762,32 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+// 关闭面板函数
+function closePanel() {
+    const panel = document.getElementById('wish-panel');
+    panel.classList.remove('active');
+    rotate = true;
+    
+    // 恢复旋转按钮状态
+    document.getElementById('rotate-toggle').textContent = "↻";
+    document.getElementById('rotate-toggle').style.backgroundColor = "rgba(0, 30, 60, 0.9)";
+    
+    // 重置所有sprite的透明度
+    group.children.forEach(child => {
+        if (child.material) {
+            child.material.opacity = 0.95;
+        }
+    });
+}
+
+// 面板关闭按钮事件
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
 // 移动端控制按钮事件
 document.getElementById('rotate-toggle').addEventListener('click', function() {
     rotate = !rotate;
-    this.textContent = rotate ? "‖" : "↻";
-    this.style.backgroundColor = rotate ? "rgba(0, 119, 255, 0.7)" : "rgba(0, 30, 60, 0.9)";
+    this.textContent = rotate ? "↻" : "‖";
+    this.style.backgroundColor = rotate ? "rgba(0, 30, 60, 0.9)" : "rgba(0, 119, 255, 0.7)";
 });
 
 document.getElementById('reset-view').addEventListener('click', function() {
@@ -715,22 +806,23 @@ document.getElementById('reset-view').addEventListener('click', function() {
     }, 300);
 });
 
-document.getElementById('close-panel').addEventListener('click', function() {
-    document.getElementById('wish-panel').classList.remove('active');
-    rotate = true;
-    document.getElementById('rotate-toggle').textContent = "↻";
-    document.getElementById('rotate-toggle').style.backgroundColor = "rgba(0, 30, 60, 0.9)";
+document.getElementById('close-panel').addEventListener('click', closePanel);
+
+// ESC键关闭面板（桌面端）
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closePanel();
+    }
 });
 
 // 初始化事件监听
 window.addEventListener('click', onMouseClick);
 window.addEventListener('mousemove', onMouseMove);
-window.addEventListener('touchstart', onTouchStart);
+window.addEventListener('touchstart', onTouchStart, { passive: false });
 window.addEventListener('resize', onWindowResize);
 
 // 初始化
 init();
 </script>
 </body>
-
 </html>
